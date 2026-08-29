@@ -145,11 +145,8 @@ npm run lint          # runs oxlint
 
 On first load, go to **Log in** and either fill in the (currently mock) form or tap **"Continue as Sakshi (demo)"** to skip straight into a seeded household ("Green Nest") with sample expenses, bills, chores, and groceries already in place.
 
-## 18. Screenshots
 
-_Add screenshots here before submission — e.g. Dashboard (mobile + desktop), Add Expense split validation, Balances page, Bills list on desktop (table view)._
-
-## 19. Current Week 2 Scope
+## 18. Current Week 2 Scope
 
 Everything above is implemented. Explicitly **out of scope** for Week 2, per the brief:
 - Spring Boot / Spring Security / JWT backend
@@ -160,7 +157,7 @@ Everything above is implemented. Explicitly **out of scope** for Week 2, per the
 
 Authentication and household data are **entirely mocked on the frontend** — see `api/auth.ts` and `data/mockData.ts`.
 
-## 20. Future Integration with Spring Boot (Week 4)
+## 19. Future Integration with Spring Boot (Week 4)
 
 The API layer was deliberately built so this integration is a swap, not a rewrite:
 1. Replace the body of each function in `api/*.ts` with a real `fetch`/`axios` call to the matching Spring Boot endpoint — the function signatures and return types don't need to change.
@@ -168,7 +165,7 @@ The API layer was deliberately built so this integration is a swap, not a rewrit
 3. Remove `data/mockData.ts` once the backend is the source of truth.
 4. `ProtectedRoute` and `RequireHousehold` don't need to change — they only care about `isAuthenticated` and `hasHousehold`, however those get determined.
 
-## 21. Future Enhancements
+## 20. Future Enhancements
 
 - Real-time updates (WebSockets) when a roommate adds an expense or completes a chore
 - Push/email notifications

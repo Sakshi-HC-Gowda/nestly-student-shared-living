@@ -113,19 +113,19 @@ Nestly follows a decoupled client-server architecture with stateless RESTful com
 ```mermaid
 graph TD
     subgraph Frontend ["Frontend (React 19 + TypeScript + Vite)"]
-        UI[React UI Components & Pages]
-        Ctx[Auth & Household Context]
-        API[API Client Layer (src/api/*)]
+        UI["React UI Components & Pages"]
+        Ctx["Auth & Household Context"]
+        API["API Client Layer (src/api/*)"]
         UI --> Ctx
         Ctx --> API
     end
 
     subgraph Backend ["Backend (Spring Boot 4.1.1 + Java 17)"]
-        Filter[JwtAuthenticationFilter]
-        Sec[Spring Security Filter Chain]
-        Ctrl[REST Controllers]
-        Svc[Service Layer (@Transactional)]
-        Repo[JPA Repositories (JOIN FETCH)]
+        Filter["JwtAuthenticationFilter"]
+        Sec["Spring Security Filter Chain"]
+        Ctrl["REST Controllers"]
+        Svc["Service Layer (@Transactional)"]
+        Repo["JPA Repositories (JOIN FETCH)"]
 
         Filter --> Sec
         Sec --> Ctrl
@@ -134,7 +134,7 @@ graph TD
     end
 
     subgraph Database ["Database (PostgreSQL)"]
-        PG[(PostgreSQL Database: nestly)]
+        PG[("PostgreSQL Database: nestly")]
         Repo --> PG
     end
 

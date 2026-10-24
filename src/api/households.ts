@@ -1,119 +1,129 @@
+import { ApiError, apiClient } from '@/api/client'
 import type { Household, CreateHouseholdInput } from '@/types/household'
 import type { User } from '@/types/auth'
 import type { ActivityItem } from '@/types/activity'
-import { mockHouseholds, membershipIndex, mockActivity } from '@/data/mockData'
 
-const MOCK_DELAY_MS = 400
+interface BackendHousehold {
+  id: number
+  name: string
+  accommodationType: string
+  inviteCode?: string
+  createdAt: string
+}
 
-function delay<T>(value: T, ms = MOCK_DELAY_MS): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms))
+interface InviteCodeResponse {
+  inviteCode: string
+}
+
+interface BackendHouseholdMember {
+  id: number
+  userId: number
+  name: string
+  role: 'OWNER' | 'MEMBER'
+  joinedAt: string
 }
 
 /** Thrown by joinHousehold so the UI can distinguish "wrong code" from "used-up code" per the wireframe spec. */
 export class InvitationError extends Error {
-  reason: 'invalid' | 'expired'
-  constructor(reason: 'invalid' | 'expired', message: string) {
+  reason: 'invalid' | 'expired' | 'duplicate'
+  constructor(reason: 'invalid' | 'expired' | 'duplicate', message: string) {
     super(message)
     this.reason = reason
   }
 }
 
-function generateInviteCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no ambiguous 0/O/1/I
-  let code = ''
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)]
+function toHousehold(
+  response: BackendHousehold,
+  members: Household['members'] = [],
+  owner?: User,
+): Household {
+  const createdAt = response.createdAt ?? new Date().toISOString()
+  return {
+    id: String(response.id),
+    name: response.name,
+    type: response.accommodationType as Household['type'],
+    inviteCode: response.inviteCode ?? '',
+    createdAt,
+    members: members.length > 0
+      ? members
+      : owner
+        ? [{ id: `${response.id}-${owner.id}`, userId: owner.id, name: owner.name, role: 'OWNER', joinedAt: createdAt }]
+        : [],
   }
-  return code
 }
 
-/**
- * Mock households API. Function signatures match what the real
- * `GET/POST /households`, `POST /households/join` REST endpoints will
- * look like, so pages built against this never need to change when
- * Week 4 swaps the implementation for real HTTP calls.
- */
+function toMember(response: BackendHouseholdMember): Household['members'][number] {
+  return {
+    id: String(response.id),
+    userId: String(response.userId),
+    name: response.name,
+    role: response.role,
+    joinedAt: response.joinedAt,
+  }
+}
+
 export const householdsApi = {
-  async getHouseholds(userId: string): Promise<Household[]> {
-    const ids = membershipIndex[userId] ?? []
-    const households = mockHouseholds.filter((h) => ids.includes(h.id))
-    return delay(households)
+  async getHouseholds(_userId?: string, user?: User): Promise<Household[]> {
+    const households = await apiClient.get<BackendHousehold[]>('/households')
+    return Promise.all(
+      households.map(async (household) => {
+        const members = await this.getHouseholdMembers(String(household.id))
+        return toHousehold(household, members, user)
+      }),
+    )
+  },
+
+  async getHouseholdMembers(householdId: string): Promise<Household['members']> {
+    const members = await apiClient.get<BackendHouseholdMember[]>(`/households/${householdId}/members`)
+    return members.map(toMember)
   },
 
   async getHouseholdById(id: string): Promise<Household | null> {
-    const household = mockHouseholds.find((h) => h.id === id) ?? null
-    return delay(household)
+    const households = await this.getHouseholds()
+    return households.find((household) => household.id === id) ?? null
   },
 
   async createHousehold(input: CreateHouseholdInput, owner: User): Promise<Household> {
-    const now = new Date().toISOString()
-    const household: Household = {
-      id: `h_${Date.now()}`,
+    const household = await apiClient.post<BackendHousehold>('/households', {
       name: input.name.trim(),
-      type: input.type,
-      inviteCode: generateInviteCode(),
-      createdAt: now,
-      members: [{ id: `m_${Date.now()}`, userId: owner.id, name: owner.name, role: 'OWNER', joinedAt: now }],
-    }
-    mockHouseholds.push(household)
-    membershipIndex[owner.id] = [...(membershipIndex[owner.id] ?? []), household.id]
-    return delay(household)
+      accommodationType: input.type,
+    })
+    return toHousehold(household, [], owner)
+  },
+
+  async getInviteCode(householdId: string): Promise<string> {
+    const response = await apiClient.get<InviteCodeResponse>(`/households/${householdId}/invite-code`)
+    return response.inviteCode
   },
 
   async joinHousehold(rawCode: string, user: User): Promise<Household> {
-    const code = rawCode.trim().toUpperCase()
-
-    // Week 2 fixture: this specific code always simulates an expired invitation.
-    if (code === 'EXPIRD') {
-      return Promise.reject(new InvitationError('expired', 'This invitation has expired. Ask for a new one.'))
-    }
-
-    const household = mockHouseholds.find((h) => h.inviteCode === code)
-    if (!household) {
-      return Promise.reject(new InvitationError('invalid', "That code doesn't match any household."))
-    }
-
-    const alreadyMember = household.members.some((m) => m.userId === user.id)
-    if (!alreadyMember) {
-      household.members.push({
-        id: `m_${Date.now()}`,
-        userId: user.id,
-        name: user.name,
-        role: 'MEMBER',
-        joinedAt: new Date().toISOString(),
+    try {
+      const household = await apiClient.post<BackendHousehold>('/households/join', {
+        inviteCode: rawCode.trim().toUpperCase(),
       })
-      membershipIndex[user.id] = [...(membershipIndex[user.id] ?? []), household.id]
+      return toHousehold(household, [], user)
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.status === 409) {
+          throw new InvitationError('duplicate', error.message)
+        }
+        if (error.status === 404 || error.status === 400) {
+          throw new InvitationError('invalid', error.message)
+        }
+      }
+      throw error
     }
-
-    return delay(household)
   },
 
-  async getRecentActivity(householdId: string): Promise<ActivityItem[]> {
-    const activity = mockActivity
-      .filter((a) => a.householdId === householdId)
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    return delay(activity)
+  async getRecentActivity(_householdId: string): Promise<ActivityItem[]> {
+    return []
   },
 
-  async removeMember(householdId: string, userId: string): Promise<Household> {
-    const household = mockHouseholds.find((h) => h.id === householdId)
-    if (!household) {
-      return Promise.reject(new Error('Household not found.'))
-    }
-    household.members = household.members.filter((m) => m.userId !== userId)
-    membershipIndex[userId] = (membershipIndex[userId] ?? []).filter((id) => id !== householdId)
-    return delay(household)
+  async removeMember(_householdId: string, _userId: string): Promise<Household> {
+    throw new Error('Removing members is not supported by the backend yet.')
   },
 
-  async transferOwnership(householdId: string, newOwnerUserId: string): Promise<Household> {
-    const household = mockHouseholds.find((h) => h.id === householdId)
-    if (!household) {
-      return Promise.reject(new Error('Household not found.'))
-    }
-    household.members = household.members.map((m) => ({
-      ...m,
-      role: m.userId === newOwnerUserId ? 'OWNER' : m.role === 'OWNER' ? 'MEMBER' : m.role,
-    }))
-    return delay(household)
+  async transferOwnership(_householdId: string, _newOwnerUserId: string): Promise<Household> {
+    throw new Error('Transferring ownership is not supported by the backend yet.')
   },
 }

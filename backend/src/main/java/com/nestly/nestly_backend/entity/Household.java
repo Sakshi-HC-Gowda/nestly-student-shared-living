@@ -4,7 +4,14 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "households")
+@Table(
+        name = "households",
+        indexes = @Index(
+                name = "idx_households_invite_code",
+                columnList = "invite_code",
+                unique = true
+        )
+)
 public class Household {
 
     @Id
@@ -16,6 +23,9 @@ public class Household {
 
     @Column(nullable = false)
     private String accommodationType;
+
+    @Column(name = "invite_code", unique = true, length = 8)
+    private String inviteCode;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -43,6 +53,14 @@ public class Household {
 
     public void setAccommodationType(String accommodationType) {
         this.accommodationType = accommodationType;
+    }
+
+    public String getInviteCode() {
+        return inviteCode;
+    }
+
+    public void setInviteCode(String inviteCode) {
+        this.inviteCode = inviteCode;
     }
 
     public LocalDateTime getCreatedAt() {

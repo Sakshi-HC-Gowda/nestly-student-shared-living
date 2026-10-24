@@ -9,11 +9,17 @@ import com.nestly.nestly_backend.repository.GroceryRepository;
 import com.nestly.nestly_backend.repository.HouseholdMemberRepository;
 import com.nestly.nestly_backend.repository.HouseholdRepository;
 import com.nestly.nestly_backend.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@Transactional(readOnly = true)
 public class GroceryService {
 
     private final GroceryRepository groceryRepository;
@@ -33,6 +39,7 @@ public class GroceryService {
         this.userRepository = userRepository;
     }
 
+    @Transactional
     public GroceryResponse createGrocery(
             GroceryRequest request,
             String email) {
@@ -51,7 +58,8 @@ public class GroceryService {
                 );
 
         if (!isMember) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
                     "You are not a member of this household"
             );
         }
@@ -84,7 +92,8 @@ public class GroceryService {
                 );
 
         if (!isMember) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
                     "You are not a member of this household"
             );
         }

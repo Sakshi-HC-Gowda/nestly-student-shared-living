@@ -10,7 +10,6 @@ export interface AuthContextValue {
   isInitializing: boolean
   login: (credentials: AuthCredentials) => Promise<void>
   register: (input: RegisterInput) => Promise<void>
-  loginAsDemoUser: () => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -37,11 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser)
   }, [])
 
-  const loginAsDemoUser = useCallback(async () => {
-    const demoUser = await authApi.loginAsDemoUser()
-    setUser(demoUser)
-  }, [])
-
   const logout = useCallback(async () => {
     await authApi.logout()
     setUser(null)
@@ -53,7 +47,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isInitializing,
     login,
     register,
-    loginAsDemoUser,
     logout,
   }
 

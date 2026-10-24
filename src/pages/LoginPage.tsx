@@ -25,7 +25,7 @@ function validate(values: LoginValues): FormErrors<LoginValues> {
 }
 
 export function LoginPage() {
-  const { login, loginAsDemoUser } = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
 
   const [values, setValues] = useState<LoginValues>({ email: '', password: '' })
@@ -54,12 +54,6 @@ export function LoginPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  async function handleDemoLogin() {
-    setIsSubmitting(true)
-    await loginAsDemoUser()
-    navigate('/dashboard')
   }
 
   return (
@@ -93,15 +87,6 @@ export function LoginPage() {
 
         <Button type="submit" fullWidth disabled={isSubmitting}>
           {isSubmitting ? 'Logging in…' : 'Log in'}
-        </Button>
-
-        <div className="relative py-1 text-center text-xs text-slate">
-          <span className="relative bg-surface px-2">or</span>
-          <div className="absolute inset-x-0 top-1/2 -z-10 border-t border-line" aria-hidden="true" />
-        </div>
-
-        <Button type="button" variant="secondary" fullWidth onClick={handleDemoLogin} disabled={isSubmitting}>
-          Continue as Sakshi (demo)
         </Button>
 
         <p className="text-center text-sm text-slate">

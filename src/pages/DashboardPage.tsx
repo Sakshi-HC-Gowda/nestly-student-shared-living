@@ -46,21 +46,33 @@ export function DashboardPage() {
   async function loadDashboard() {
     if (!currentHousehold || !user) return
     setState('loading')
-    try {
-      const [expenses, balances, bills, chores, recentActivity] = await Promise.all([
-        expensesApi.getExpenses(currentHousehold.id),
-        settlementsApi.getBalances(currentHousehold.id),
-        billsApi.getBills(currentHousehold.id),
-        choresApi.getChores(currentHousehold.id),
-        householdsApi.getRecentActivity(currentHousehold.id),
-      ])
 
+    let hasAnyData = false
+    let hasAnyError = false
+
+    // Fetch each data source independently so one failure doesn't block the rest
+    try {
+      const expenses = await expensesApi.getExpenses(currentHousehold.id)
       const spendingThisMonth = expenses
         .filter((e) => isSameMonth(e.date))
         .reduce((sum, e) => sum + e.amount, 0)
+      setMonthlySpending(spendingThisMonth)
+      hasAnyData = true
 
-      const myBalanceEntry = balances.find((b: Balance) => b.userId === user.id)
+      // Balances depend on expenses + members — compute after expenses succeed
+      try {
+        const balances = await settlementsApi.getBalances(currentHousehold.id)
+        const myBalanceEntry = balances.find((b: Balance) => b.userId === user.id)
+        setMyBalance(myBalanceEntry?.amount ?? 0)
+      } catch {
+        // Non-critical: balance defaults to 0
+      }
+    } catch {
+      hasAnyError = true
+    }
 
+    try {
+      const bills = await billsApi.getBills(currentHousehold.id)
       const unpaidBills = bills.filter((b) => b.status !== 'Paid')
       const myPendingDues = unpaidBills.reduce((sum, b) => sum + (b.shares[user.id] ?? 0), 0)
       const statusPriority: Record<string, number> = { Overdue: 0, Due: 1, Upcoming: 2 }
@@ -69,18 +81,34 @@ export function DashboardPage() {
         if (priorityDiff !== 0) return priorityDiff
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
       })[0]
-
-      const choresToday = chores.filter((c) => isToday(c.dueDate) && c.status !== 'Completed').length
-
-      setMonthlySpending(spendingThisMonth)
-      setMyBalance(myBalanceEntry?.amount ?? 0)
       setPendingDues(myPendingDues)
-      setTodaysChoreCount(choresToday)
       setNextBill(upcoming ?? null)
-      setActivity(recentActivity)
-      setState('ready')
+      hasAnyData = true
     } catch {
+      hasAnyError = true
+    }
+
+    try {
+      const chores = await choresApi.getChores(currentHousehold.id)
+      const choresToday = chores.filter((c) => isToday(c.dueDate) && c.status !== 'Completed').length
+      setTodaysChoreCount(choresToday)
+      hasAnyData = true
+    } catch {
+      hasAnyError = true
+    }
+
+    try {
+      const recentActivity = await householdsApi.getRecentActivity(currentHousehold.id)
+      setActivity(recentActivity)
+    } catch {
+      // Non-critical: activity defaults to empty
+    }
+
+    // Only show error state if nothing loaded at all
+    if (hasAnyError && !hasAnyData) {
       setState('error')
+    } else {
+      setState('ready')
     }
   }
 

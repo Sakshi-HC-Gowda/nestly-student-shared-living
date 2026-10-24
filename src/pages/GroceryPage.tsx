@@ -18,6 +18,7 @@ export function GroceryPage() {
   const [state, setState] = useState<LoadState>('loading')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<GroceryItem | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   async function loadItems() {
     if (!currentHousehold) return
@@ -37,20 +38,35 @@ export function GroceryPage() {
   }, [currentHousehold?.id])
 
   async function handleTogglePurchased(id: string) {
-    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, purchased: !item.purchased } : item)))
-    await groceriesApi.togglePurchased(id)
+    setActionError(null)
+    try {
+      const updated = await groceriesApi.togglePurchased(id)
+      setItems((prev) => prev.map((item) => (item.id === id ? updated : item)))
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not update this grocery item.')
+    }
   }
 
   async function handleDelete(id: string) {
-    setItems((prev) => prev.filter((item) => item.id !== id))
-    await groceriesApi.deleteItem(id)
+    setActionError(null)
+    try {
+      await groceriesApi.deleteItem(id)
+      setItems((prev) => prev.filter((item) => item.id !== id))
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not delete this grocery item.')
+    }
   }
 
   async function handleSubmit(input: CreateGroceryItemInput) {
     if (!currentHousehold || !user) return
+    setActionError(null)
     if (editingItem) {
-      const updated = await groceriesApi.updateItem(editingItem.id, input)
-      setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+      try {
+        const updated = await groceriesApi.updateItem(editingItem.id, input)
+        setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Could not update this grocery item.')
+      }
     } else {
       const created = await groceriesApi.addItem(currentHousehold.id, input, user.id, user.name)
       setItems((prev) => [...prev, created])
@@ -91,6 +107,8 @@ export function GroceryPage() {
       )}
 
       {state === 'error' && <ErrorState description="Couldn't load the grocery list." onRetry={loadItems} />}
+
+      {actionError && <div className="mb-4"><ErrorState description={actionError} /></div>}
 
       {state === 'ready' && items.length === 0 && (
         <EmptyState

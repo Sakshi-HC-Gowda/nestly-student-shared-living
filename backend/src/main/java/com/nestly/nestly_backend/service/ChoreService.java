@@ -9,11 +9,17 @@ import com.nestly.nestly_backend.repository.ChoreRepository;
 import com.nestly.nestly_backend.repository.HouseholdMemberRepository;
 import com.nestly.nestly_backend.repository.HouseholdRepository;
 import com.nestly.nestly_backend.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@Transactional(readOnly = true)
 public class ChoreService {
 
     private final ChoreRepository choreRepository;
@@ -33,6 +39,7 @@ public class ChoreService {
         this.userRepository = userRepository;
     }
 
+    @Transactional
     public ChoreResponse createChore(
             ChoreRequest request,
             String email) {
@@ -51,7 +58,8 @@ public class ChoreService {
                 );
 
         if (!creatorIsMember) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
                     "You are not a member of this household"
             );
         }
@@ -69,7 +77,8 @@ public class ChoreService {
                 );
 
         if (!assignedUserIsMember) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
                     "Assigned user is not a member of this household"
             );
         }
@@ -103,7 +112,8 @@ public class ChoreService {
                 );
 
         if (!isMember) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
                     "You are not a member of this household"
             );
         }

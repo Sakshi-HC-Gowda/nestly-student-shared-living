@@ -1,61 +1,61 @@
+import { apiClient } from '@/api/client'
 import type { GroceryItem, CreateGroceryItemInput } from '@/types/grocery'
-import { mockGroceryItems } from '@/data/mockData'
 
-const MOCK_DELAY_MS = 350
+interface BackendGrocery {
+  id: number
+  name: string
+  quantity: string
+  estimatedPrice?: number
+  status: 'PENDING' | 'PURCHASED'
+  householdId: number
+  addedByUserId: number
+  addedByName: string
+  createdAt: string
+}
 
-function delay<T>(value: T, ms = MOCK_DELAY_MS): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms))
+function toGroceryItem(response: BackendGrocery): GroceryItem {
+  return {
+    id: String(response.id),
+    householdId: String(response.householdId),
+    name: response.name,
+    quantity: response.quantity,
+    note: response.estimatedPrice === undefined || response.estimatedPrice === null ? undefined : `Est. Rs ${response.estimatedPrice}`,
+    purchased: response.status === 'PURCHASED',
+    addedByUserId: String(response.addedByUserId),
+    addedByName: response.addedByName,
+  }
 }
 
 export const groceriesApi = {
   async getItems(householdId: string): Promise<GroceryItem[]> {
-    const items = mockGroceryItems.filter((item) => item.householdId === householdId)
-    return delay(items)
+    const items = await apiClient.get<BackendGrocery[]>(`/groceries/household/${householdId}`)
+    return items.map(toGroceryItem)
   },
 
   async addItem(
     householdId: string,
     input: CreateGroceryItemInput,
-    addedByUserId: string,
-    addedByName: string,
+    _addedByUserId: string,
+    _addedByName: string,
   ): Promise<GroceryItem> {
-    const item: GroceryItem = {
-      id: `g_${Date.now()}`,
-      householdId,
+    const item = await apiClient.post<BackendGrocery>('/groceries', {
       name: input.name.trim(),
-      quantity: input.quantity?.trim() || undefined,
-      note: input.note?.trim() || undefined,
-      purchased: false,
-      addedByUserId,
-      addedByName,
-    }
-    mockGroceryItems.push(item)
-    return delay(item)
+      quantity: input.quantity?.trim() || '1',
+      estimatedPrice: undefined,
+      householdId: Number(householdId),
+    })
+    return toGroceryItem(item)
   },
 
-  async updateItem(id: string, input: CreateGroceryItemInput): Promise<GroceryItem> {
-    const item = mockGroceryItems.find((i) => i.id === id)
-    if (!item) {
-      return Promise.reject(new Error('Item not found.'))
-    }
-    item.name = input.name.trim()
-    item.quantity = input.quantity?.trim() || undefined
-    item.note = input.note?.trim() || undefined
-    return delay(item)
+  async updateItem(_id: string, _input: CreateGroceryItemInput): Promise<GroceryItem> {
+    throw new Error('Editing grocery items is not supported by the backend yet.')
   },
 
-  async togglePurchased(id: string): Promise<GroceryItem> {
-    const item = mockGroceryItems.find((i) => i.id === id)
-    if (!item) {
-      return Promise.reject(new Error('Item not found.'))
-    }
-    item.purchased = !item.purchased
-    return delay(item)
+  async togglePurchased(_id: string): Promise<GroceryItem> {
+    throw new Error('Updating grocery purchase status is not supported by the backend yet.')
   },
 
-  async deleteItem(id: string): Promise<void> {
-    const index = mockGroceryItems.findIndex((i) => i.id === id)
-    if (index !== -1) mockGroceryItems.splice(index, 1)
-    return delay(undefined)
+  async deleteItem(_id: string): Promise<void> {
+    throw new Error('Deleting grocery items is not supported by the backend yet.')
   },
 }

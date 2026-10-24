@@ -10,7 +10,7 @@ import type { Household } from '@/types/household'
 
 export function JoinHouseholdPage() {
   const { user } = useAuth()
-  const { addHousehold } = useHousehold()
+  const { refreshHouseholds } = useHousehold()
   const navigate = useNavigate()
 
   const [code, setCode] = useState('')
@@ -30,10 +30,24 @@ export function JoinHouseholdPage() {
     setIsSubmitting(true)
     try {
       const household = await householdsApi.joinHousehold(code, user)
-      addHousehold(household)
-      setJoined(household)
+      const households = await refreshHouseholds()
+      setJoined(households.find((item) => item.id === household.id) ?? household)
     } catch (error) {
       if (error instanceof InvitationError) {
+        if (error.reason === 'duplicate') {
+          try {
+            const households = await refreshHouseholds()
+            const existingHousehold = households.find(
+              (item) => item.inviteCode === code.trim().toUpperCase(),
+            )
+            if (existingHousehold) {
+              setJoined(existingHousehold)
+              return
+            }
+          } catch {
+            // Keep the backend's duplicate-membership message if refresh fails.
+          }
+        }
         setFieldError(error.message)
       } else {
         setFieldError('Something went wrong. Try again.')

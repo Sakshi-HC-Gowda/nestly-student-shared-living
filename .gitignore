@@ -29,6 +29,9 @@ backend/.idea/
 backend/*.iml
 
 # Environment and local configuration
+.env
+.env.*
+!.env.example
 backend/.env
 backend/.env.*
 backend/application-local.properties

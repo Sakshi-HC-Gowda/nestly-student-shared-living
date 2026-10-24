@@ -7,6 +7,7 @@ import { Card, Button, Input, Badge, Skeleton, EmptyState, ErrorState } from '@/
 import type { BadgeTone } from '@/components/common'
 import { InviteCodeCard } from '@/components/household/InviteCodeCard'
 import { useHousehold } from '@/hooks/useHousehold'
+import { householdsApi } from '@/api/households'
 import { invitationsApi } from '@/api/invitations'
 import { isValidEmail, isEmpty } from '@/utils/validation'
 import type { Invitation, InvitationStatus } from '@/types/household'
@@ -21,10 +22,13 @@ const STATUS_TONE: Record<InvitationStatus, BadgeTone> = {
 type ListState = 'loading' | 'error' | 'ready'
 
 export function InviteMembersPage() {
-  const { currentHousehold } = useHousehold()
+  const { currentHousehold, updateHousehold } = useHousehold()
 
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [listState, setListState] = useState<ListState>('loading')
+  const [inviteCode, setInviteCode] = useState(currentHousehold?.inviteCode ?? '')
+  const [isInviteCodeLoading, setIsInviteCodeLoading] = useState(false)
+  const [inviteCodeError, setInviteCodeError] = useState<string | null>(null)
 
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
@@ -42,8 +46,29 @@ export function InviteMembersPage() {
     }
   }
 
+  async function loadInviteCode() {
+    if (!currentHousehold) return
+    setIsInviteCodeLoading(true)
+    setInviteCodeError(null)
+    try {
+      const code = await householdsApi.getInviteCode(currentHousehold.id)
+      setInviteCode(code)
+      updateHousehold({ ...currentHousehold, inviteCode: code })
+    } catch (error) {
+      setInviteCodeError(error instanceof Error ? error.message : 'Could not load invite code.')
+    } finally {
+      setIsInviteCodeLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadInvitations()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentHousehold?.id])
+
+  useEffect(() => {
+    setInviteCode(currentHousehold?.inviteCode ?? '')
+    loadInviteCode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentHousehold?.id])
 
@@ -105,7 +130,12 @@ export function InviteMembersPage() {
           </form>
         </Card>
 
-        <InviteCodeCard code={currentHousehold.inviteCode} />
+        <InviteCodeCard
+          code={inviteCode}
+          isLoading={isInviteCodeLoading}
+          error={inviteCodeError}
+          onRetry={loadInviteCode}
+        />
 
         <Card padded={false}>
           <h2 className="px-4 pt-4 text-sm font-semibold text-ink">Pending &amp; past invitations</h2>

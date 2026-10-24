@@ -1,32 +1,29 @@
 import type { Balance, SuggestedSettlement, Settlement } from '@/types/settlement'
-import { mockExpenses, mockHouseholds } from '@/data/mockData'
+import { expensesApi } from '@/api/expenses'
+import { householdsApi } from '@/api/households'
 
-const MOCK_DELAY_MS = 400
-
-function delay<T>(value: T, ms = MOCK_DELAY_MS): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms))
-}
-
-/** Recorded settlements reduce what's shown as owed. Empty for Week 2 — "Mark as Settled" appends to this in Phase 7. */
+/** Recorded settlements reduce what's shown as owed. Client-side until a backend endpoint exists. */
 const mockSettlements: Settlement[] = []
 
-function computeBalances(householdId: string): Balance[] {
-  const household = mockHouseholds.find((h) => h.id === householdId)
-  if (!household) return []
+async function computeBalances(householdId: string): Promise<Balance[]> {
+  const [expenses, members] = await Promise.all([
+    expensesApi.getExpenses(householdId),
+    householdsApi.getHouseholdMembers(householdId),
+  ])
+
+  if (members.length === 0) return []
 
   const net: Record<string, number> = {}
-  household.members.forEach((m) => {
+  members.forEach((m) => {
     net[m.userId] = 0
   })
 
-  mockExpenses
-    .filter((e) => e.householdId === householdId)
-    .forEach((expense) => {
-      net[expense.paidByUserId] = (net[expense.paidByUserId] ?? 0) + expense.amount
-      Object.entries(expense.shares).forEach(([userId, amount]) => {
-        net[userId] = (net[userId] ?? 0) - amount
-      })
+  expenses.forEach((expense) => {
+    net[expense.paidByUserId] = (net[expense.paidByUserId] ?? 0) + expense.amount
+    Object.entries(expense.shares).forEach(([userId, amount]) => {
+      net[userId] = (net[userId] ?? 0) - amount
     })
+  })
 
   mockSettlements
     .filter((s) => s.householdId === householdId)
@@ -35,10 +32,10 @@ function computeBalances(householdId: string): Balance[] {
       net[settlement.toUserId] = (net[settlement.toUserId] ?? 0) - settlement.amount
     })
 
-  return household.members.map((m) => ({
+  return members.map((m) => ({
     userId: m.userId,
     name: m.name,
-    amount: Math.round(net[m.userId] * 100) / 100,
+    amount: Math.round((net[m.userId] ?? 0) * 100) / 100,
   }))
 }
 
@@ -76,11 +73,12 @@ function computeSuggestedSettlements(balances: Balance[]): SuggestedSettlement[]
 
 export const settlementsApi = {
   async getBalances(householdId: string): Promise<Balance[]> {
-    return delay(computeBalances(householdId))
+    return computeBalances(householdId)
   },
 
   async getSuggestedSettlements(householdId: string): Promise<SuggestedSettlement[]> {
-    return delay(computeSuggestedSettlements(computeBalances(householdId)))
+    const balances = await computeBalances(householdId)
+    return computeSuggestedSettlements(balances)
   },
 
   async markSettled(fromUserId: string, fromName: string, toUserId: string, toName: string, amount: number, householdId: string): Promise<Settlement> {
@@ -95,6 +93,6 @@ export const settlementsApi = {
       settledAt: new Date().toISOString(),
     }
     mockSettlements.push(settlement)
-    return delay(settlement)
+    return settlement
   },
 }

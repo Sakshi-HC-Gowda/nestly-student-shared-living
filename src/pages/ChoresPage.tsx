@@ -16,6 +16,7 @@ export function ChoresPage() {
   const [state, setState] = useState<LoadState>('loading')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [completingId, setCompletingId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   async function loadChores() {
     if (!currentHousehold) return
@@ -35,10 +36,13 @@ export function ChoresPage() {
   }, [currentHousehold?.id])
 
   async function handleComplete(id: string) {
+    setActionError(null)
     setCompletingId(id)
     try {
       const updated = await choresApi.completeChore(id)
       setChores((prev) => prev.map((c) => (c.id === id ? updated : c)))
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not complete this chore.')
     } finally {
       setCompletingId(null)
     }
@@ -69,6 +73,8 @@ export function ChoresPage() {
       )}
 
       {state === 'error' && <ErrorState description="Couldn't load chores for this household." onRetry={loadChores} />}
+
+      {actionError && <div className="mb-4"><ErrorState description={actionError} /></div>}
 
       {state === 'ready' && chores.length === 0 && (
         <EmptyState

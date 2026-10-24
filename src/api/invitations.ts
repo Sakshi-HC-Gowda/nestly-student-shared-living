@@ -1,41 +1,45 @@
+import { apiClient } from '@/api/client'
 import type { Invitation } from '@/types/household'
-import { mockInvitations } from '@/data/mockData'
 
-const MOCK_DELAY_MS = 400
-
-function delay<T>(value: T, ms = MOCK_DELAY_MS): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms))
+interface BackendInvitation {
+  id: number
+  invitedEmail: string
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
+  createdAt: string
+  household?: {
+    id: number
+  }
 }
 
-/**
- * Mock invitations API — Week 2 simulates email/link/code invites entirely
- * on the frontend. Same shape a real `POST /households/:id/invitations`
- * endpoint will return, so this swaps cleanly in Week 4.
- */
+function toInvitation(response: BackendInvitation, householdId: string): Invitation {
+  const statusMap = {
+    PENDING: 'Pending',
+    ACCEPTED: 'Accepted',
+    REJECTED: 'Cancelled',
+  } as const
+
+  return {
+    id: String(response.id),
+    householdId: response.household?.id ? String(response.household.id) : householdId,
+    email: response.invitedEmail,
+    status: statusMap[response.status],
+    sentAt: response.createdAt,
+  }
+}
+
 export const invitationsApi = {
-  async getInvitations(householdId: string): Promise<Invitation[]> {
-    const invitations = mockInvitations.filter((inv) => inv.householdId === householdId)
-    return delay(invitations)
+  async getInvitations(_householdId: string): Promise<Invitation[]> {
+    return []
   },
 
   async sendInvitation(householdId: string, email: string): Promise<Invitation> {
-    const invitation: Invitation = {
-      id: `inv_${Date.now()}`,
-      householdId,
-      email: email.trim(),
-      status: 'Pending',
-      sentAt: new Date().toISOString(),
-    }
-    mockInvitations.push(invitation)
-    return delay(invitation)
+    const invitation = await apiClient.post<BackendInvitation>(`/households/${householdId}/invitations`, {
+      invitedEmail: email.trim(),
+    })
+    return toInvitation(invitation, householdId)
   },
 
-  async cancelInvitation(id: string): Promise<Invitation> {
-    const invitation = mockInvitations.find((inv) => inv.id === id)
-    if (!invitation) {
-      return Promise.reject(new Error('Invitation not found.'))
-    }
-    invitation.status = 'Cancelled'
-    return delay(invitation)
+  async cancelInvitation(_id: string): Promise<Invitation> {
+    throw new Error('Cancelling invitations is not supported by the backend yet.')
   },
 }

@@ -1,90 +1,97 @@
+import { apiClient } from '@/api/client'
 import type { Expense, CreateExpenseInput } from '@/types/expense'
-import { mockExpenses, mockHouseholds, mockActivity } from '@/data/mockData'
 
-const MOCK_DELAY_MS = 400
-
-function delay<T>(value: T, ms = MOCK_DELAY_MS): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms))
+interface BackendExpense {
+  id: number
+  description: string
+  amount: number
+  category: string
+  householdId: number
+  paidByUserId: number
+  paidByName: string
+  createdAt: string
 }
 
-/** Resolves the split method + raw input into a final per-participant shares map. Assumes the input already passed form validation. */
+interface BackendExpenseSplit {
+  id: number
+  userId: number
+  userName: string
+  amount: number
+}
+
+const expenseCache = new Map<string, Expense>()
+
 function resolveShares(input: CreateExpenseInput): Record<string, number> {
-  const { splitMethod, participantIds, amount, splitValues } = input
-
-  if (splitMethod === 'Equal') {
-    const base = Math.floor((amount / participantIds.length) * 100) / 100
-    const shares: Record<string, number> = {}
-    let distributed = 0
-    participantIds.forEach((id, index) => {
-      if (index === participantIds.length - 1) {
-        // Last participant absorbs the rounding remainder so shares always sum exactly to `amount`.
-        shares[id] = Math.round((amount - distributed) * 100) / 100
-      } else {
-        shares[id] = base
-        distributed += base
-      }
-    })
-    return shares
-  }
-
-  if (splitMethod === 'Exact') {
-    const shares: Record<string, number> = {}
-    participantIds.forEach((id) => {
-      shares[id] = Math.round((splitValues?.[id] ?? 0) * 100) / 100
-    })
-    return shares
-  }
-
-  // Percentage
   const shares: Record<string, number> = {}
-  participantIds.forEach((id) => {
-    const pct = splitValues?.[id] ?? 0
-    shares[id] = Math.round(((amount * pct) / 100) * 100) / 100
+  if (input.splitMethod === 'Equal') {
+    const base = Math.floor((input.amount / input.participantIds.length) * 100) / 100
+    let distributed = 0
+    input.participantIds.forEach((id, index) => {
+      shares[id] = index === input.participantIds.length - 1 ? Math.round((input.amount - distributed) * 100) / 100 : base
+      distributed += index === input.participantIds.length - 1 ? 0 : base
+    })
+    return shares
+  }
+  input.participantIds.forEach((id) => {
+    const rawValue = input.splitValues?.[id] ?? 0
+    shares[id] = input.splitMethod === 'Percentage' ? Math.round(((input.amount * rawValue) / 100) * 100) / 100 : rawValue
   })
   return shares
 }
 
+function toExpense(response: BackendExpense, splits: BackendExpenseSplit[] = []): Expense {
+  const participantIds = splits.map((split) => String(split.userId))
+  const shares = Object.fromEntries(splits.map((split) => [String(split.userId), Number(split.amount)]))
+  const expense: Expense = {
+    id: String(response.id),
+    householdId: String(response.householdId),
+    amount: Number(response.amount),
+    description: response.description,
+    category: response.category as Expense['category'],
+    paidByUserId: String(response.paidByUserId),
+    paidByName: response.paidByName,
+    participantIds,
+    splitMethod: splits.length > 0 ? 'Exact' : 'Equal',
+    shares,
+    date: response.createdAt,
+  }
+  expenseCache.set(expense.id, expense)
+  return expense
+}
+
 export const expensesApi = {
   async getExpenses(householdId: string): Promise<Expense[]> {
-    const expenses = mockExpenses
-      .filter((e) => e.householdId === householdId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    return delay(expenses)
+    const expenses = await apiClient.get<BackendExpense[]>(`/expenses/household/${householdId}`)
+    const withSplits = await Promise.all(
+      expenses.map(async (expense) => {
+        const splits = await apiClient.get<BackendExpenseSplit[]>(`/expenses/${expense.id}/splits`)
+        return toExpense(expense, splits)
+      }),
+    )
+    return withSplits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   },
 
   async getExpenseById(id: string): Promise<Expense | null> {
-    const expense = mockExpenses.find((e) => e.id === id) ?? null
-    return delay(expense)
+    return expenseCache.get(id) ?? null
   },
 
   async createExpense(householdId: string, input: CreateExpenseInput): Promise<Expense> {
-    const household = mockHouseholds.find((h) => h.id === householdId)
-    const payer = household?.members.find((m) => m.userId === input.paidByUserId)
-
-    const expense: Expense = {
-      id: `e_${Date.now()}`,
-      householdId,
-      amount: input.amount,
+    const shares = resolveShares(input)
+    const response = await apiClient.post<BackendExpense>('/expenses', {
       description: input.description.trim(),
+      amount: input.amount,
       category: input.category,
-      paidByUserId: input.paidByUserId,
-      paidByName: payer?.name ?? 'Unknown',
-      participantIds: input.participantIds,
-      splitMethod: input.splitMethod,
-      shares: resolveShares(input),
-      date: input.date,
-      notes: input.notes?.trim() || undefined,
-    }
-
-    mockExpenses.unshift(expense)
-    mockActivity.unshift({
-      id: `a_${Date.now()}`,
-      householdId,
-      type: 'expense',
-      message: `${expense.paidByName} added ₹${expense.amount.toLocaleString('en-IN')} ${expense.description.toLowerCase()}`,
-      timestamp: new Date().toISOString(),
+      householdId: Number(householdId),
+      splits: Object.entries(shares).map(([userId, amount]) => ({
+        userId: Number(userId),
+        amount,
+      })),
     })
-
-    return delay(expense)
+    return toExpense(response, Object.entries(shares).map(([userId, amount]) => ({
+      id: 0,
+      userId: Number(userId),
+      userName: '',
+      amount,
+    })))
   },
 }

@@ -3,8 +3,8 @@ import { useAuth } from '@/hooks/useAuth'
 
 /**
  * Gate for any route that requires a signed-in user. `isInitializing`
- * covers the brief moment where we're restoring the mock session (or,
- * later, validating a JWT) on page load, so we don't flash a redirect.
+ * covers the brief moment where we're restoring the local JWT session on
+ * page load, so we don't flash a redirect.
  */
 export function ProtectedRoute() {
   const { isAuthenticated, isInitializing } = useAuth()

@@ -1,9 +1,10 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useHousehold } from '@/hooks/useHousehold'
+import { ErrorState } from '@/components/common'
 
 /** Sits inside ProtectedRoute. Sends anyone with zero households to onboarding first. */
 export function RequireHousehold() {
-  const { hasHousehold, isLoading } = useHousehold()
+  const { hasHousehold, isLoading, error, refreshHouseholds } = useHousehold()
 
   if (isLoading) {
     return (
@@ -11,6 +12,10 @@ export function RequireHousehold() {
         <p className="text-sm text-slate">Loading your households…</p>
       </div>
     )
+  }
+
+  if (error) {
+    return <ErrorState description={error} onRetry={refreshHouseholds} />
   }
 
   if (!hasHousehold) {

@@ -1,48 +1,24 @@
+import { apiClient } from '@/api/client'
 import type { Bill, CreateBillInput } from '@/types/bill'
-import { mockBills, mockActivity } from '@/data/mockData'
 
-const MOCK_DELAY_MS = 400
-
-function delay<T>(value: T, ms = MOCK_DELAY_MS): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms))
+interface BackendBill {
+  id: number
+  title: string
+  amount: number
+  dueDate: string
+  category: string
+  status: 'PENDING' | 'PAID'
+  householdId: number
+  createdByUserId: number
+  createdByName: string
+  createdAt: string
 }
 
-function resolveShares(
-  amount: number,
-  participantIds: string[],
-  splitMethod: CreateBillInput['splitMethod'],
-  splitValues?: Record<string, number>,
-): Record<string, number> {
-  if (splitMethod === 'Equal') {
-    const base = Math.floor((amount / participantIds.length) * 100) / 100
-    const shares: Record<string, number> = {}
-    let distributed = 0
-    participantIds.forEach((id, index) => {
-      if (index === participantIds.length - 1) {
-        shares[id] = Math.round((amount - distributed) * 100) / 100
-      } else {
-        shares[id] = base
-        distributed += base
-      }
-    })
-    return shares
-  }
-  if (splitMethod === 'Exact') {
-    const shares: Record<string, number> = {}
-    participantIds.forEach((id) => {
-      shares[id] = Math.round((splitValues?.[id] ?? 0) * 100) / 100
-    })
-    return shares
-  }
-  const shares: Record<string, number> = {}
-  participantIds.forEach((id) => {
-    shares[id] = Math.round(((amount * (splitValues?.[id] ?? 0)) / 100) * 100) / 100
-  })
-  return shares
-}
+const billCache = new Map<string, Bill>()
 
-function computeStatus(dueDate: string): Bill['status'] {
-  const due = new Date(dueDate)
+function computeStatus(response: BackendBill): Bill['status'] {
+  if (response.status === 'PAID') return 'Paid'
+  const due = new Date(response.dueDate)
   const now = new Date()
   const dayInMs = 24 * 60 * 60 * 1000
   if (due.getTime() < now.getTime() - dayInMs) return 'Overdue'
@@ -50,61 +26,46 @@ function computeStatus(dueDate: string): Bill['status'] {
   return 'Upcoming'
 }
 
+function toBill(response: BackendBill): Bill {
+  const bill: Bill = {
+    id: String(response.id),
+    householdId: String(response.householdId),
+    title: response.title,
+    amount: Number(response.amount),
+    dueDate: response.dueDate,
+    category: response.category as Bill['category'],
+    participantIds: [],
+    splitMethod: 'Equal',
+    shares: {},
+    recurring: false,
+    status: computeStatus(response),
+  }
+  billCache.set(bill.id, bill)
+  return bill
+}
+
 export const billsApi = {
   async getBills(householdId: string): Promise<Bill[]> {
-    const bills = mockBills
-      .filter((b) => b.householdId === householdId)
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-    return delay(bills)
+    const bills = await apiClient.get<BackendBill[]>(`/bills/household/${householdId}`)
+    return bills.map(toBill).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
   },
 
   async getBillById(id: string): Promise<Bill | null> {
-    const bill = mockBills.find((b) => b.id === id) ?? null
-    return delay(bill)
+    return billCache.get(id) ?? null
   },
 
-  async createBill(
-    householdId: string,
-    input: CreateBillInput,
-    splitValues?: Record<string, number>,
-  ): Promise<Bill> {
-    const bill: Bill = {
-      id: `b_${Date.now()}`,
-      householdId,
+  async createBill(householdId: string, input: CreateBillInput, _splitValues?: Record<string, number>): Promise<Bill> {
+    const bill = await apiClient.post<BackendBill>('/bills', {
       title: input.title.trim(),
       amount: input.amount,
-      dueDate: input.dueDate,
+      dueDate: input.dueDate.slice(0, 10),
       category: input.category,
-      participantIds: input.participantIds,
-      splitMethod: input.splitMethod,
-      shares: resolveShares(input.amount, input.participantIds, input.splitMethod, splitValues),
-      recurring: input.recurring,
-      status: computeStatus(input.dueDate),
-    }
-    mockBills.push(bill)
-    mockActivity.unshift({
-      id: `a_${Date.now()}`,
-      householdId,
-      type: 'bill',
-      message: `${bill.title} bill added, due ${new Date(bill.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`,
-      timestamp: new Date().toISOString(),
+      householdId: Number(householdId),
     })
-    return delay(bill)
+    return toBill(bill)
   },
 
-  async markBillPaid(id: string): Promise<Bill> {
-    const bill = mockBills.find((b) => b.id === id)
-    if (!bill) {
-      return Promise.reject(new Error('Bill not found.'))
-    }
-    bill.status = 'Paid'
-    mockActivity.unshift({
-      id: `a_${Date.now()}`,
-      householdId: bill.householdId,
-      type: 'bill',
-      message: `${bill.title} bill marked as paid`,
-      timestamp: new Date().toISOString(),
-    })
-    return delay(bill)
+  async markBillPaid(_id: string): Promise<Bill> {
+    throw new Error('Marking bills paid is not supported by the backend yet.')
   },
 }

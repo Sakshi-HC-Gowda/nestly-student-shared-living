@@ -13,7 +13,7 @@ export interface HouseholdContextValue {
   isLoading: boolean
   error: string | null
   setCurrentHouseholdId: (id: string) => void
-  refreshHouseholds: () => Promise<void>
+  refreshHouseholds: () => Promise<Household[]>
   /** Inserts a newly created/joined household and makes it the active one. Used from Phase 5 onward. */
   addHousehold: (household: Household) => void
   /** Replaces one household in state with an updated copy (e.g. after removing a member). */
@@ -23,22 +23,22 @@ export interface HouseholdContextValue {
 export const HouseholdContext = createContext<HouseholdContextValue | undefined>(undefined)
 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isInitializing: isAuthInitializing } = useAuth()
   const [households, setHouseholds] = useState<Household[]>([])
   const [currentHouseholdId, setCurrentHouseholdIdState] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadHouseholds = useCallback(async () => {
+  const loadHouseholds = useCallback(async (): Promise<Household[]> => {
     if (!user) {
       setHouseholds([])
       setIsLoading(false)
-      return
+      return []
     }
     setIsLoading(true)
     setError(null)
     try {
-      const result = await householdsApi.getHouseholds(user.id)
+      const result = await householdsApi.getHouseholds(user.id, user)
       setHouseholds(result)
 
       const storedId = localStorage.getItem(ACTIVE_HOUSEHOLD_KEY)
@@ -50,22 +50,27 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       } else {
         setCurrentHouseholdIdState(null)
       }
+      return result
     } catch {
       setError('Could not load your households.')
+      return []
     } finally {
       setIsLoading(false)
     }
   }, [user])
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthInitializing) {
+      setIsLoading(true)
+    } else if (isAuthenticated) {
       loadHouseholds()
     } else {
       setHouseholds([])
       setCurrentHouseholdIdState(null)
+      localStorage.removeItem(ACTIVE_HOUSEHOLD_KEY)
       setIsLoading(false)
     }
-  }, [isAuthenticated, loadHouseholds])
+  }, [isAuthInitializing, isAuthenticated, loadHouseholds])
 
   const setCurrentHouseholdId = useCallback((id: string) => {
     setCurrentHouseholdIdState(id)

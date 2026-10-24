@@ -15,11 +15,16 @@ import com.nestly.nestly_backend.repository.HouseholdRepository;
 import com.nestly.nestly_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import com.nestly.nestly_backend.exception.InvalidExpenseException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 @Service
+@Transactional(readOnly = true)
 public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
@@ -42,6 +47,7 @@ public class ExpenseService {
         this.userRepository = userRepository;
     }
 
+    @Transactional
     public ExpenseResponse createExpense(
             ExpenseRequest request,
             String email) {
@@ -59,7 +65,8 @@ public class ExpenseService {
                 );
 
         if (!isMember) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
                     "You are not a member of this household"
             );
         }
@@ -107,7 +114,8 @@ public class ExpenseService {
                         );
 
                 if (!splitUserIsMember) {
-                    throw new RuntimeException(
+                    throw new ResponseStatusException(
+                            HttpStatus.FORBIDDEN,
                             "Split user is not a member of this household"
                     );
                 }
@@ -139,7 +147,8 @@ public class ExpenseService {
                 );
 
         if (!isMember) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
                     "You are not a member of this household"
             );
         }
@@ -167,7 +176,8 @@ public class ExpenseService {
                 );
 
         if (!isMember) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
                     "You are not a member of this household"
             );
         }

@@ -1,0 +1,35 @@
+# Version control
+.git
+.gitignore
+
+# Environment files and credentials
+.env
+.env.*
+backend/.env
+backend/.env.*
+*.pem
+*.key
+
+# Frontend build artifacts and dependencies
+node_modules
+dist
+dist-ssr
+coverage
+
+# Backend build artifacts
+backend/target
+backend/.idea
+backend/*.iml
+*.log
+
+# IDE and OS metadata
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Documentation and reports
+reports
+docs
+scripts
+submission-week5

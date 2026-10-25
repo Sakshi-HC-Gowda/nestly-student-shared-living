@@ -540,6 +540,46 @@ Detailed technical reports for Week 5 are preserved in:
 
 ---
 
+## 13.6. Week 6: Deployment, Maintenance, and Project Reflection
+
+### Deployment Architecture & Overview
+Nestly is configured for decoupled cloud hosting on **Render**:
+- **Backend**: Containerized Spring Boot Web Service using a multi-stage [`Dockerfile`](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/Dockerfile) (`eclipse-temurin:17-jre-jammy`, unprivileged `nestly` user).
+- **Frontend**: High-performance Static Site built with Vite (`npm ci && npm run build` → `dist/`) with SPA rewrite rules (`/*` → `/index.html`).
+- **Database**: Managed Render PostgreSQL instance with internal VPC networking.
+
+### Cloud Environment Configuration
+Refer to [`.env.example`](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/.env.example) for a complete template of all production and local variables.
+
+#### Backend Web Service (Render Environment Variables)
+| Variable | Description | Example / Source |
+|---|---|---|
+| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC Connection URL | `jdbc:postgresql://<internal-host>:5432/<dbname>` |
+| `DB_USERNAME` | Database username | From Render PostgreSQL dashboard |
+| `DB_PASSWORD` | Database password | From Render PostgreSQL dashboard |
+| `JWT_SECRET` | 256-bit+ HMAC-SHA256 signing secret | Generated via `openssl rand -base64 48` |
+| `APP_CORS_ALLOWED_ORIGINS` | Allowed frontend origins (comma-separated) | `https://nestly-frontend.onrender.com` |
+| `PORT` | Container HTTP listen port | Automatically supplied by Render (`8080` fallback) |
+
+#### Frontend Static Site (Render Environment Variables)
+| Variable | Description | Example / Source |
+|---|---|---|
+| `VITE_API_BASE_URL` | Backend API base path (build-time) | `https://nestly-backend.onrender.com/api` |
+
+### Production Readiness Highlights
+1. **Container Security**: Multi-stage Docker build separating Maven JDK build tools from the lightweight runtime JRE, running under a dedicated unprivileged `nestly` user.
+2. **CORS Hardening**: Strict origin whitelist configured dynamically via `APP_CORS_ALLOWED_ORIGINS` with credentials enabled and wildcards disallowed.
+3. **Database Security & Logging**: Hibernate SQL logging disabled in production (`show-sql=false`), sensitive secrets externalized into environment variables.
+4. **Resilient Routing**: SPA rewrite rule (`/*` → `/index.html`) ensuring React Router deep links survive browser reloads.
+
+### Week 6 Documentation Artifacts
+Complete operational and reflective documents for Week 6 are located under [`docs/week6/`](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/docs/week6/):
+- [**Deployment Guide** (`docs/week6/deployment-guide.md`)](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/docs/week6/deployment-guide.md): Step-by-step instructions for provisioning PostgreSQL, deploying backend & frontend services on Render, CORS setup, and troubleshooting.
+- [**Maintenance Plan** (`docs/week6/maintenance-plan.md`)](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/docs/week6/maintenance-plan.md): Operational guide covering monitoring, logging, database backups, dependency upgrades, bug tracking, and release management.
+- [**Project Reflection** (`docs/week6/project-reflection.md`)](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/docs/week6/project-reflection.md): Retrospective covering key learnings, architecture decisions, challenges encountered, testing experiences, and future enhancements.
+
+---
+
 ## 14. Screenshots and Submission Artifacts
 
 ### Recommended Evidence for Evaluators

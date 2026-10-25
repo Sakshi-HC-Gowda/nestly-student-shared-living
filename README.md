@@ -53,10 +53,14 @@ Nestly provides a single shared source of truth for the entire household:
 - **Chores Coordination:**
   - Assign household chores (`POST /api/chores`) to specific household members with deadlines and descriptions.
   - Household chores listing (`GET /api/chores/household/{id}`) with assignee and creator names.
+  - Mark chores as completed (`PUT /api/chores/{id}/complete`) with persistent status updates in PostgreSQL.
 
 - **Grocery Shopping List:**
   - Add grocery items (`POST /api/groceries`) with quantity, estimated price, and status (`PENDING` / `PURCHASED`).
   - Household grocery list (`GET /api/groceries/household/{id}`).
+  - Toggle grocery item purchased status (`PUT /api/groceries/{id}/toggle`).
+  - Edit grocery items (`PUT /api/groceries/{id}`).
+  - Delete grocery items (`DELETE /api/groceries/{id}`) with real database removal.
 
 - **Dashboard & Aggregations:**
   - Summary metrics: Monthly spending total, individual pending dues, today's chore count, and upcoming bills.
@@ -74,7 +78,7 @@ To ensure full transparency for evaluation, the following features operate with 
 - **Analytics:** Category spending breakdown and month-over-month comparisons are dynamically derived on the client from live expense data.
 - **Notifications:** Renders simulated notification records (the backend does not yet include a notification entity or controller).
 - **Email Delivery:** In-app invitation records are stored in PostgreSQL; automated outbound SMTP email delivery is a planned enhancement.
-- **Single-Item Status Updates:** Marking bills as paid, completing chores, or toggling grocery items are updated optimistically in the client UI; dedicated single-item `PUT`/`DELETE` endpoints are not yet implemented in the backend.
+- **Bills Settlement:** Marking bills as paid is updated optimistically in the client UI (backend single-bill payment endpoint is planned). Chore completion and grocery item editing, toggling, and deletion are fully integrated with backend endpoints and PostgreSQL persistence.
 
 ---
 
@@ -331,12 +335,16 @@ All endpoints are hosted under the `/api` prefix. Interactive API documentation 
 |--------|------|:-------------:|-------------|
 | `POST` | `/api/chores` | Yes (Member) | Create a chore assigned to a household roommate |
 | `GET` | `/api/chores/household/{id}` | Yes (Member) | List household chores with assignee details |
+| `PUT` | `/api/chores/{id}/complete` | Yes (Member) | Mark a chore as completed |
 
 ### Groceries (`/api/groceries`)
 | Method | Path | Auth Required | Description |
 |--------|------|:-------------:|-------------|
 | `POST` | `/api/groceries` | Yes (Member) | Add an item to the household grocery shopping list |
 | `GET` | `/api/groceries/household/{id}` | Yes (Member) | List grocery items with added-by user details |
+| `PUT` | `/api/groceries/{id}` | Yes (Member) | Update a grocery item's name or quantity |
+| `PUT` | `/api/groceries/{id}/toggle` | Yes (Member) | Toggle grocery item status (`PENDING` / `PURCHASED`) |
+| `DELETE` | `/api/groceries/{id}` | Yes (Member) | Delete an item from the grocery shopping list |
 
 ### Diagnostics (`/api/test`)
 | Method | Path | Auth Required | Description |
@@ -390,19 +398,19 @@ The backend uses **Spring Data JPA** with **Hibernate 7.4.5** on top of a **Post
 cd backend
 
 # Run focused Service Unit Tests
-.\mvnw.cmd test -Dtest=ExpenseServiceTest
-.\mvnw.cmd test -Dtest=HouseholdServiceTest
-.\mvnw.cmd test -Dtest=AuthControllerTest
+.\mvnw.cmd test "-Dtest=ChoreServiceTest,GroceryServiceTest,ExpenseServiceTest,HouseholdServiceTest"
 
 # Package backend without running tests (fast build verification)
 .\mvnw.cmd package -DskipTests
 ```
 
 **Verified Test Results:**
+- `ChoreServiceTest`: **4 passed, 0 failed** (covers chore completion, status transition to `COMPLETED`, 404 handling, and 403 Forbidden enforcement for non-members).
+- `GroceryServiceTest`: **5 passed, 0 failed** (covers grocery item deletion, status toggle between `PENDING` and `PURCHASED`, item updates, and 403 Forbidden enforcement).
 - `ExpenseServiceTest`: **4 passed, 0 failed** (covers expense retrieval with payer details, split breakdown with participant details, and 403 Forbidden enforcement for non-members).
 - `HouseholdServiceTest`: **3 passed, 0 failed** (covers household creation, invite code generation, and member retrieval).
-- `AuthControllerTest`: **Passed** (covers user registration and login validation).
-- `mvn package`: **BUILD SUCCESS** (all 61 Java source files compile cleanly).
+- **Total Test Suite:** **16 passed, 0 failed** across all core business services.
+- `mvn package`: **BUILD SUCCESS** (all backend Java source files compile cleanly into an executable jar).
 
 > [!NOTE]
 > `NestlyBackendApplicationTests.contextLoads` performs a full Spring Boot integration bootstrap requiring an active PostgreSQL connection with matching credentials. Unit tests run autonomously with Mockito mocks.

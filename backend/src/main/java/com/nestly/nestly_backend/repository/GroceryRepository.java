@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface GroceryRepository extends JpaRepository<GroceryItem, Long> {
 
@@ -18,4 +19,13 @@ public interface GroceryRepository extends JpaRepository<GroceryItem, Long> {
         ORDER BY g.createdAt DESC
     """)
     List<GroceryItem> findByHouseholdId(@Param("householdId") Long householdId);
+
+    @Query("""
+        SELECT g
+        FROM GroceryItem g
+        JOIN FETCH g.addedBy
+        JOIN FETCH g.household
+        WHERE g.id = :id
+    """)
+    Optional<GroceryItem> findByIdWithDetails(@Param("id") Long id);
 }

@@ -47,15 +47,20 @@ export const groceriesApi = {
     return toGroceryItem(item)
   },
 
-  async updateItem(_id: string, _input: CreateGroceryItemInput): Promise<GroceryItem> {
-    throw new Error('Editing grocery items is not supported by the backend yet.')
+  async updateItem(id: string, input: CreateGroceryItemInput): Promise<GroceryItem> {
+    const item = await apiClient.put<BackendGrocery>(`/groceries/${id}`, {
+      name: input.name.trim(),
+      quantity: input.quantity?.trim() || '1',
+    })
+    return toGroceryItem(item)
   },
 
-  async togglePurchased(_id: string): Promise<GroceryItem> {
-    throw new Error('Updating grocery purchase status is not supported by the backend yet.')
+  async togglePurchased(id: string): Promise<GroceryItem> {
+    const item = await apiClient.put<BackendGrocery>(`/groceries/${id}/toggle`)
+    return toGroceryItem(item)
   },
 
-  async deleteItem(_id: string): Promise<void> {
-    throw new Error('Deleting grocery items is not supported by the backend yet.')
+  async deleteItem(id: string): Promise<void> {
+    await apiClient.delete<void>(`/groceries/${id}`)
   },
 }

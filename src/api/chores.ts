@@ -46,7 +46,8 @@ export const choresApi = {
     return toChore(chore)
   },
 
-  async completeChore(_id: string): Promise<Chore> {
-    throw new Error('Completing chores is not supported by the backend yet.')
+  async completeChore(id: string): Promise<Chore> {
+    const chore = await apiClient.put<BackendChore>(`/chores/${id}/complete`)
+    return toChore(chore)
   },
 }

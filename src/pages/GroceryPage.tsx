@@ -68,8 +68,12 @@ export function GroceryPage() {
         setActionError(error instanceof Error ? error.message : 'Could not update this grocery item.')
       }
     } else {
-      const created = await groceriesApi.addItem(currentHousehold.id, input, user.id, user.name)
-      setItems((prev) => [...prev, created])
+      try {
+        const created = await groceriesApi.addItem(currentHousehold.id, input, user.id, user.name)
+        setItems((prev) => [...prev, created])
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Could not add this grocery item.')
+      }
     }
   }
 

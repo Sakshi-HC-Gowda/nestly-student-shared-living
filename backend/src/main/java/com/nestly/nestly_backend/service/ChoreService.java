@@ -13,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -45,11 +44,11 @@ public class ChoreService {
             String email) {
 
         User creator = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Household household = householdRepository
                 .findById(request.getHouseholdId())
-                .orElseThrow(() -> new RuntimeException("Household not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Household not found"));
 
         boolean creatorIsMember =
                 householdMemberRepository.existsByUserIdAndHouseholdId(
@@ -67,7 +66,7 @@ public class ChoreService {
         User assignedUser = userRepository
                 .findById(request.getAssignedToUserId())
                 .orElseThrow(() ->
-                        new RuntimeException("Assigned user not found")
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Assigned user not found")
                 );
 
         boolean assignedUserIsMember =
@@ -103,7 +102,7 @@ public class ChoreService {
             String email) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         boolean isMember =
                 householdMemberRepository.existsByUserIdAndHouseholdId(
@@ -122,6 +121,35 @@ public class ChoreService {
                 .stream()
                 .map(this::convertToResponse)
                 .toList();
+    }
+
+    @Transactional
+    public ChoreResponse completeChore(
+            Long choreId,
+            String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        Chore chore = choreRepository.findByIdWithDetails(choreId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chore not found"));
+
+        boolean isMember = householdMemberRepository.existsByUserIdAndHouseholdId(
+                user.getId(),
+                chore.getHousehold().getId()
+        );
+
+        if (!isMember) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You are not a member of this household"
+            );
+        }
+
+        chore.setStatus(Chore.Status.COMPLETED);
+        Chore savedChore = choreRepository.save(chore);
+
+        return convertToResponse(savedChore);
     }
 
     private ChoreResponse convertToResponse(Chore chore) {

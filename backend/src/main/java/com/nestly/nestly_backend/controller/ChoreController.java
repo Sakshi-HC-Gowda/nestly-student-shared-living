@@ -42,4 +42,15 @@ public class ChoreController {
                 authentication.getName()
         );
     }
+
+    @PutMapping("/{choreId}/complete")
+    public ChoreResponse completeChore(
+            @PathVariable Long choreId,
+            Authentication authentication) {
+
+        return choreService.completeChore(
+                choreId,
+                authentication.getName()
+        );
+    }
 }

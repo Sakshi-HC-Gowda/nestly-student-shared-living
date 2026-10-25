@@ -62,17 +62,44 @@ function toExpense(response: BackendExpense, splits: BackendExpenseSplit[] = [])
 export const expensesApi = {
   async getExpenses(householdId: string): Promise<Expense[]> {
     const expenses = await apiClient.get<BackendExpense[]>(`/expenses/household/${householdId}`)
-    const withSplits = await Promise.all(
-      expenses.map(async (expense) => {
-        const splits = await apiClient.get<BackendExpenseSplit[]>(`/expenses/${expense.id}/splits`)
-        return toExpense(expense, splits)
-      }),
-    )
-    return withSplits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    const converted = expenses.map((expense) => {
+      const existing = expenseCache.get(String(expense.id))
+      if (existing && existing.participantIds.length > 0) {
+        return existing
+      }
+      return toExpense(expense, [])
+    })
+    return converted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   },
 
-  async getExpenseById(id: string): Promise<Expense | null> {
-    return expenseCache.get(id) ?? null
+  async getExpenseById(id: string, householdId?: string): Promise<Expense | null> {
+    let cached = expenseCache.get(id)
+    if (!cached && householdId) {
+      await expensesApi.getExpenses(householdId)
+      cached = expenseCache.get(id)
+    }
+
+    try {
+      const splits = await apiClient.get<BackendExpenseSplit[]>(`/expenses/${id}/splits`)
+      if (cached) {
+        return toExpense(
+          {
+            id: Number(cached.id),
+            description: cached.description,
+            amount: cached.amount,
+            category: cached.category,
+            householdId: Number(cached.householdId),
+            paidByUserId: Number(cached.paidByUserId),
+            paidByName: cached.paidByName,
+            createdAt: cached.date,
+          },
+          splits,
+        )
+      }
+    } catch {
+      // If splits fail or endpoint is unreachable, fallback to cached expense
+    }
+    return cached ?? null
   },
 
   async createExpense(householdId: string, input: CreateExpenseInput): Promise<Expense> {

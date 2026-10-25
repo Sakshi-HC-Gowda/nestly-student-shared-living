@@ -35,3 +35,7 @@ backend/*.iml
 backend/.env
 backend/.env.*
 backend/application-local.properties
+
+# Testing and coverage reports
+coverage/
+reports/

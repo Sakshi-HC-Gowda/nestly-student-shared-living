@@ -135,4 +135,212 @@ class ExpenseServiceTest {
 
         assertEquals(403, exception.getStatusCode().value());
     }
+
+    @Test
+    void createExpenseSuccessWithSplits() {
+        User user = mock(User.class);
+        Household household = mock(Household.class);
+        User splitUser = mock(User.class);
+        Expense savedExpense = mock(Expense.class);
+
+        when(user.getId()).thenReturn(2L);
+        when(user.getName()).thenReturn("Member");
+        when(household.getId()).thenReturn(3L);
+        when(splitUser.getId()).thenReturn(5L);
+
+        when(userRepository.findByEmail("member@example.com")).thenReturn(Optional.of(user));
+        when(householdRepository.findById(3L)).thenReturn(Optional.of(household));
+        when(householdMemberRepository.existsByUserIdAndHouseholdId(2L, 3L)).thenReturn(true);
+        when(householdMemberRepository.existsByUserIdAndHouseholdId(5L, 3L)).thenReturn(true);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(splitUser));
+
+        when(savedExpense.getId()).thenReturn(20L);
+        when(savedExpense.getDescription()).thenReturn("Groceries");
+        when(savedExpense.getAmount()).thenReturn(new BigDecimal("50.00"));
+        when(savedExpense.getCategory()).thenReturn("Food");
+        when(savedExpense.getHousehold()).thenReturn(household);
+        when(savedExpense.getPaidBy()).thenReturn(user);
+        when(savedExpense.getCreatedAt()).thenReturn(LocalDateTime.now());
+        when(expenseRepository.save(org.mockito.ArgumentMatchers.any(Expense.class))).thenReturn(savedExpense);
+
+        com.nestly.nestly_backend.dto.ExpenseRequest request = new com.nestly.nestly_backend.dto.ExpenseRequest();
+        request.setHouseholdId(3L);
+        request.setDescription("Groceries");
+        request.setAmount(new BigDecimal("50.00"));
+        request.setCategory("Food");
+
+        com.nestly.nestly_backend.dto.ExpenseSplitRequest split = new com.nestly.nestly_backend.dto.ExpenseSplitRequest();
+        split.setUserId(5L);
+        split.setAmount(new BigDecimal("50.00"));
+        request.setSplits(List.of(split));
+
+        ExpenseResponse response = expenseService.createExpense(request, "member@example.com");
+
+        assertEquals(20L, response.getId());
+        assertEquals("Groceries", response.getDescription());
+        assertEquals(new BigDecimal("50.00"), response.getAmount());
+        org.mockito.Mockito.verify(expenseRepository).save(org.mockito.ArgumentMatchers.any(Expense.class));
+        org.mockito.Mockito.verify(expenseSplitRepository).save(org.mockito.ArgumentMatchers.any(ExpenseSplit.class));
+    }
+
+    @Test
+    void createExpenseSuccessWithoutSplits() {
+        User user = mock(User.class);
+        Household household = mock(Household.class);
+        Expense savedExpense = mock(Expense.class);
+
+        when(user.getId()).thenReturn(2L);
+        when(user.getName()).thenReturn("Member");
+        when(household.getId()).thenReturn(3L);
+
+        when(userRepository.findByEmail("member@example.com")).thenReturn(Optional.of(user));
+        when(householdRepository.findById(3L)).thenReturn(Optional.of(household));
+        when(householdMemberRepository.existsByUserIdAndHouseholdId(2L, 3L)).thenReturn(true);
+
+        when(savedExpense.getId()).thenReturn(21L);
+        when(savedExpense.getDescription()).thenReturn("Internet");
+        when(savedExpense.getAmount()).thenReturn(new BigDecimal("40.00"));
+        when(savedExpense.getCategory()).thenReturn("Utilities");
+        when(savedExpense.getHousehold()).thenReturn(household);
+        when(savedExpense.getPaidBy()).thenReturn(user);
+        when(savedExpense.getCreatedAt()).thenReturn(LocalDateTime.now());
+        when(expenseRepository.save(org.mockito.ArgumentMatchers.any(Expense.class))).thenReturn(savedExpense);
+
+        com.nestly.nestly_backend.dto.ExpenseRequest request = new com.nestly.nestly_backend.dto.ExpenseRequest();
+        request.setHouseholdId(3L);
+        request.setDescription("Internet");
+        request.setAmount(new BigDecimal("40.00"));
+        request.setCategory("Utilities");
+
+        ExpenseResponse response = expenseService.createExpense(request, "member@example.com");
+
+        assertEquals(21L, response.getId());
+        org.mockito.Mockito.verify(expenseSplitRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void createExpenseThrowsNotFoundWhenUserNotFound() {
+        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+
+        com.nestly.nestly_backend.dto.ExpenseRequest request = new com.nestly.nestly_backend.dto.ExpenseRequest();
+        request.setHouseholdId(1L);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                expenseService.createExpense(request, "unknown@example.com")
+        );
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
+    void createExpenseThrowsNotFoundWhenHouseholdNotFound() {
+        User user = mock(User.class);
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(householdRepository.findById(99L)).thenReturn(Optional.empty());
+
+        com.nestly.nestly_backend.dto.ExpenseRequest request = new com.nestly.nestly_backend.dto.ExpenseRequest();
+        request.setHouseholdId(99L);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                expenseService.createExpense(request, "user@example.com")
+        );
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
+    void createExpenseThrowsForbiddenWhenCreatorNotMember() {
+        User user = mock(User.class);
+        Household household = mock(Household.class);
+        when(user.getId()).thenReturn(10L);
+        when(household.getId()).thenReturn(3L);
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(householdRepository.findById(3L)).thenReturn(Optional.of(household));
+        when(householdMemberRepository.existsByUserIdAndHouseholdId(10L, 3L)).thenReturn(false);
+
+        com.nestly.nestly_backend.dto.ExpenseRequest request = new com.nestly.nestly_backend.dto.ExpenseRequest();
+        request.setHouseholdId(3L);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                expenseService.createExpense(request, "user@example.com")
+        );
+        assertEquals(403, ex.getStatusCode().value());
+    }
+
+    @Test
+    void createExpenseThrowsInvalidExpenseWhenSplitTotalDoesNotMatch() {
+        User user = mock(User.class);
+        Household household = mock(Household.class);
+        when(user.getId()).thenReturn(2L);
+        when(household.getId()).thenReturn(3L);
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(householdRepository.findById(3L)).thenReturn(Optional.of(household));
+        when(householdMemberRepository.existsByUserIdAndHouseholdId(2L, 3L)).thenReturn(true);
+
+        com.nestly.nestly_backend.dto.ExpenseRequest request = new com.nestly.nestly_backend.dto.ExpenseRequest();
+        request.setHouseholdId(3L);
+        request.setAmount(new BigDecimal("100.00"));
+
+        com.nestly.nestly_backend.dto.ExpenseSplitRequest split = new com.nestly.nestly_backend.dto.ExpenseSplitRequest();
+        split.setUserId(2L);
+        split.setAmount(new BigDecimal("60.00"));
+        request.setSplits(List.of(split));
+
+        assertThrows(com.nestly.nestly_backend.exception.InvalidExpenseException.class, () ->
+                expenseService.createExpense(request, "user@example.com")
+        );
+    }
+
+    @Test
+    void createExpenseThrowsForbiddenWhenSplitUserNotMember() {
+        User user = mock(User.class);
+        Household household = mock(Household.class);
+        User splitUser = mock(User.class);
+
+        when(user.getId()).thenReturn(2L);
+        when(household.getId()).thenReturn(3L);
+        when(splitUser.getId()).thenReturn(7L);
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(householdRepository.findById(3L)).thenReturn(Optional.of(household));
+        when(householdMemberRepository.existsByUserIdAndHouseholdId(2L, 3L)).thenReturn(true);
+        when(userRepository.findById(7L)).thenReturn(Optional.of(splitUser));
+        when(householdMemberRepository.existsByUserIdAndHouseholdId(7L, 3L)).thenReturn(false);
+
+        Expense savedExpense = mock(Expense.class);
+        when(expenseRepository.save(org.mockito.ArgumentMatchers.any())).thenReturn(savedExpense);
+
+        com.nestly.nestly_backend.dto.ExpenseRequest request = new com.nestly.nestly_backend.dto.ExpenseRequest();
+        request.setHouseholdId(3L);
+        request.setAmount(new BigDecimal("50.00"));
+        com.nestly.nestly_backend.dto.ExpenseSplitRequest split = new com.nestly.nestly_backend.dto.ExpenseSplitRequest();
+        split.setUserId(7L);
+        split.setAmount(new BigDecimal("50.00"));
+        request.setSplits(List.of(split));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                expenseService.createExpense(request, "user@example.com")
+        );
+        assertEquals(403, ex.getStatusCode().value());
+    }
+
+    @Test
+    void getHouseholdExpensesThrowsNotFoundWhenUserNotFound() {
+        when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                expenseService.getHouseholdExpenses(1L, "missing@example.com")
+        );
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
+    void getExpenseSplitsThrowsNotFoundWhenExpenseNotFound() {
+        User user = mock(User.class);
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(expenseRepository.findById(999L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                expenseService.getExpenseSplits(999L, "user@example.com")
+        );
+        assertEquals(404, ex.getStatusCode().value());
+    }
 }

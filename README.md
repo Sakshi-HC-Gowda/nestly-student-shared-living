@@ -464,6 +464,82 @@ npm run build
 
 ---
 
+## 13.5. Week 5: Testing, Debugging, and Optimization
+
+### Testing Strategy & Categories
+The project implements a multi-layer testing pyramid spanning isolated unit tests, controller/web layer slice tests, frontend component/interaction tests, and full context database integration tests:
+
+1. **Backend Unit Tests (JUnit 5 + Mockito):**
+   - Covers business logic in `ExpenseService`, `ChoreService`, `GroceryService`, `HouseholdService`, `BillService`, `InvitationService`, and `AuthService`.
+   - Tests happy path operations, boundary validations, missing resources (HTTP 404), unauthorized actions (HTTP 403), duplicate joins (HTTP 409), and password hashing via BCrypt.
+2. **Backend Controller & Integration Tests (MockMvc + `@RestControllerAdvice`):**
+   - Tests REST endpoints (`AuthController`, `ExpenseController`, `ChoreController`, `GroceryController`, `HouseholdController`, `BillController`).
+   - Verifies HTTP status codes (200, 201, 204, 400, 403, 404, 409), JSON request deserialization, payload validation errors, and response formatting.
+3. **Backend Database Context Tests (`@SpringBootTest`):**
+   - Bootstraps full Spring Boot context against PostgreSQL. Requires `$env:DB_USERNAME` and `$env:DB_PASSWORD`.
+4. **Frontend Unit & Component Tests (Vitest + React Testing Library + jsdom):**
+   - Covers `apiClient` header injection, 401 token clearing, network errors, and structured validation error extraction.
+   - Tests modal components (`AddExpenseModal`, `GroceryItemModal`), pages (`LoginPage`, `RegisterPage`, `GroceryPage`, `ChoresPage`), form validation, loading skeletons, error states, and actions (toggle, delete, complete).
+
+### Prerequisites
+- **Java**: JDK 17+ (tested with Java 23)
+- **Node.js**: v18+ (tested with Node v20+)
+- **PostgreSQL**: Required for running the live application server (port 5432). Note: Unit, controller, and context tests run against an isolated in-memory test database and do not require external PostgreSQL.
+
+### Testing Commands
+
+#### Backend Tests & Coverage:
+```powershell
+# From nestly/backend:
+# Run the complete test suite (99 tests across unit, controller, and context tests):
+.\mvnw.cmd test
+
+# Run a specific test class:
+.\mvnw.cmd test "-Dtest=NestlyBackendApplicationTests"
+.\mvnw.cmd test "-Dtest=ExpenseServiceTest"
+
+# Generate JaCoCo coverage report (backend/target/site/jacoco):
+# Generated automatically during test execution with jacoco-maven-plugin.
+```
+
+#### Frontend Tests & Coverage:
+```bash
+# From nestly/:
+npm test                 # Run all 29 Vitest frontend tests
+npm run test:coverage    # Generate text, json, and html coverage reports
+npm run lint             # Oxlint code inspection
+npm run build            # Typecheck and production bundle build
+```
+
+#### Automated Report Collection:
+```powershell
+# Collects all test and coverage reports into nestly/reports/:
+powershell -ExecutionPolicy Bypass -File .\scripts\collect-reports.ps1
+```
+
+### Test Configuration Isolation
+- **Test Configuration (`backend/src/test/resources/application.properties`)**: Configures an isolated in-memory H2 database (`jdbc:h2:mem:nestly_test`) in PostgreSQL mode with `create-drop` DDL and a 256-bit test JWT secret. Allows running `.\mvnw.cmd test` hermetically in CI/CD and developer environments without requiring active PostgreSQL or environment variables.
+- **Production Configuration (`backend/src/main/resources/application.properties`)**: Strictly requires runtime environment variables (`DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`) connecting to PostgreSQL. No credentials or secrets are committed.
+
+### Confirmed Bugs & Fixes
+- **Bug 1 (HTTP 500 on Missing Resources):** Service methods threw raw `RuntimeException` on missing entities. Fixed by throwing `ResponseStatusException(HttpStatus.NOT_FOUND, ...)`, returning clean 404 JSON responses.
+- **Bug 2 (Frontend Swallowed Field Validation Errors):** `extractErrorMessage` in `client.ts` evaluated `'message'` before `'errors'`/`'fieldErrors'`, hiding specific input errors. Fixed to extract field-level error messages first.
+- **Bug 3 (Direct Navigation / Refresh on Expense Details Failed):** `getExpenseById` relied solely on in-memory cache. Updated to load household expenses on demand and fetch splits dynamically.
+- **Bug 4 (Cascading State Dispatches in Context):** Removed redundant synchronous `setIsLoading(true)` calls inside `HouseholdContext` effect.
+- **Bug 5 (Context Smoke Test Failed on Missing Test Datasource):** `NestlyBackendApplicationTests.contextLoads` failed with `PSQLException: FATAL: password authentication failed for user "${DB_USERNAME}"` when run without environment variables. Fixed by configuring test-scoped H2 in `backend/src/test/resources/application.properties` and `pom.xml`, allowing context tests to run hermetically.
+
+### Performance Optimizations
+- **N+1 HTTP Request Elimination:** In `expensesApi.getExpenses()`, removed `Promise.all` fetching splits for every single expense upfront. For 20 expenses, HTTP requests dropped from 21 down to 1 (**95.2% reduction**). Splits are now loaded on demand only when viewing individual expense details.
+- **JOIN FETCH Auditing:** Confirmed all JPA listing queries utilize `JOIN FETCH` to eliminate Hibernate N+1 query cascades when `open-in-view=false`.
+
+### Documentation Artifacts
+Detailed technical reports for Week 5 are preserved in:
+- [`docs/week5/testing-strategy.md`](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/docs/week5/testing-strategy.md)
+- [`docs/week5/debugging-report.md`](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/docs/week5/debugging-report.md)
+- [`docs/week5/optimization-report.md`](file:///c:/Users/Sakshi%20Gowda/Downloads/nestly-fullstack/nestly/docs/week5/optimization-report.md)
+
+---
+
 ## 14. Screenshots and Submission Artifacts
 
 ### Recommended Evidence for Evaluators

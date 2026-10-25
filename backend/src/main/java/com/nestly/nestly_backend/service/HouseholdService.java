@@ -40,7 +40,7 @@ public class HouseholdService {
     public Household createHousehold(HouseholdRequest request, String email) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Household household = new Household();
         household.setName(request.getName());
@@ -62,7 +62,7 @@ public class HouseholdService {
     public List<Household> getMyHouseholds(String email) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         return householdMemberRepository.findByUserIdWithHousehold(user.getId())
         .stream()

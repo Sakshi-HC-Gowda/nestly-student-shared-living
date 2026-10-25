@@ -45,10 +45,10 @@ public class BillService {
             String email) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Household household = householdRepository.findById(request.getHouseholdId())
-                .orElseThrow(() -> new RuntimeException("Household not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Household not found"));
 
         boolean isMember =
                 householdMemberRepository.existsByUserIdAndHouseholdId(
@@ -83,7 +83,7 @@ public class BillService {
             String email) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         boolean isMember =
                 householdMemberRepository.existsByUserIdAndHouseholdId(

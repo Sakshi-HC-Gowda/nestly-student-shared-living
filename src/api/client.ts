@@ -30,12 +30,19 @@ function getFriendlyStatusMessage(status: number, path: string): string {
 
 function extractErrorMessage(body: unknown, status: number, path: string): string {
   if (body && typeof body === 'object') {
-    if ('error' in body && typeof body.error === 'string') return body.error
-    if ('message' in body && typeof body.message === 'string') return body.message
+    if ('errors' in body && body.errors && typeof body.errors === 'object') {
+      const first = Object.values(body.errors)[0]
+      if (typeof first === 'string') return first
+    }
     if ('fieldErrors' in body && body.fieldErrors && typeof body.fieldErrors === 'object') {
       const first = Object.values(body.fieldErrors)[0]
       if (typeof first === 'string') return first
     }
+    if ('error' in body && typeof body.error === 'string') return body.error
+    if ('message' in body && typeof body.message === 'string' && body.message !== 'Validation failed') {
+      return body.message
+    }
+    if ('message' in body && typeof body.message === 'string') return body.message
   }
   return getFriendlyStatusMessage(status, path)
 }

@@ -61,8 +61,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isAuthInitializing) {
-      setIsLoading(true)
-    } else if (isAuthenticated) {
+      return
+    }
+    if (isAuthenticated) {
       loadHouseholds()
     } else {
       setHouseholds([])

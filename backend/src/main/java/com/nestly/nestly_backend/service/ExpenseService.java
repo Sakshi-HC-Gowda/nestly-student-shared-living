@@ -53,10 +53,10 @@ public class ExpenseService {
             String email) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Household household = householdRepository.findById(request.getHouseholdId())
-                .orElseThrow(() -> new RuntimeException("Household not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Household not found"));
 
         boolean isMember = householdMemberRepository
                 .existsByUserIdAndHouseholdId(
@@ -104,7 +104,7 @@ public class ExpenseService {
                 User splitUser = userRepository.findById(
                         splitRequest.getUserId()
                 ).orElseThrow(() ->
-                        new RuntimeException("Split user not found")
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Split user not found")
                 );
 
                 boolean splitUserIsMember =
@@ -138,7 +138,7 @@ public class ExpenseService {
             String email) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         boolean isMember = householdMemberRepository
                 .existsByUserIdAndHouseholdId(
@@ -164,10 +164,10 @@ public class ExpenseService {
             String email) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Expense expense = expenseRepository.findById(expenseId)
-                .orElseThrow(() -> new RuntimeException("Expense not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Expense not found"));
 
         boolean isMember =
                 householdMemberRepository.existsByUserIdAndHouseholdId(

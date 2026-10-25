@@ -37,7 +37,7 @@ public class InvitationService {
             String ownerEmail) {
 
         User owner = userRepository.findByEmail(ownerEmail)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "User not found"));
 
         HouseholdMember ownerMembership =
                 householdMemberRepository
@@ -48,10 +48,10 @@ public class InvitationService {
                                         && member.getRole() == HouseholdMember.Role.OWNER)
                         .findFirst()
                         .orElseThrow(() ->
-                                new RuntimeException("Only the household owner can invite members"));
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Only the household owner can invite members"));
 
         Household household = householdRepository.findById(householdId)
-                .orElseThrow(() -> new RuntimeException("Household not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Household not found"));
 
         Invitation invitation = new Invitation();
         invitation.setHousehold(household);
@@ -64,14 +64,14 @@ public class InvitationService {
         Invitation invitation = invitationRepository
                 .findByIdAndInvitedEmail(invitationId, userEmail)
                 .orElseThrow(() ->
-                        new RuntimeException("Invitation not found"));
+                        new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Invitation not found"));
 
         if (invitation.getStatus() != Invitation.Status.PENDING) {
-            throw new RuntimeException("Invitation is no longer pending");
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Invitation is no longer pending");
         }
 
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "User not found"));
 
         Household household = invitation.getHousehold();
 

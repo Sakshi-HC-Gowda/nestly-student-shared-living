@@ -24,7 +24,7 @@ export function ExpenseDetailsPage() {
     if (!id) return
     setState('loading')
     try {
-      const result = await expensesApi.getExpenseById(id)
+      const result = await expensesApi.getExpenseById(id, currentHousehold?.id)
       if (!result) {
         setState('not-found')
         return

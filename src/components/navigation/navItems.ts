@@ -14,7 +14,7 @@ export interface NavItem {
   label: string
   path: string
   icon: LucideIcon
-  /** Shown in the mobile bottom nav (kept to 5 for touch comfort). */
+  /** Shown directly in the mobile bottom nav; other supported sections use More. */
   primary?: boolean
 }
 
